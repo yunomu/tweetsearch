@@ -1,0 +1,22 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Kifu</title>
+  <script src="/main.js"></script>
+  <link href="/elm-datepicker.css" rel="stylesheet">
+</head>
+<body>
+  <main id="app"></main>
+  <script>
+    const date = new Date();
+    const app = Elm.Main.init({
+        node: document.getElementById("app"),
+        flags: {
+            tzOffset: date.getTimezoneOffset()
+        }
+    });
+    app.ports.newTab.subscribe(url => window.open(url, '_blank'));
+  </script>
+</body>
+</html>
