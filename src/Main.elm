@@ -4,7 +4,6 @@ import Browser
 import Browser.Navigation as Nav
 import Date exposing (Date)
 import DatePicker
-import Debug
 import Element exposing (Element)
 import Element.Input as Input
 import Html exposing (Html)
@@ -214,7 +213,7 @@ update msg model =
             ( { model | toUser = txt }, Cmd.none )
 
         ClearToUser ->
-            ( Debug.log "clear" { model | toUser = "" }, Cmd.none )
+            ( { model | toUser = "" }, Cmd.none )
 
         SwitchDateRangeType typ ->
             case model.dateRangeType of
