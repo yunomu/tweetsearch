@@ -1,10 +1,5 @@
 version: 0.2
 
-env:
-  parameter-store:
-    SITE_DOMAIN_NAME: /tweetsearch/prod/siteDomainName
-    CERTIFICATE: /stack/env/Certificate
-
 phases:
   pre_build:
     commands:
