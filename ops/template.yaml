@@ -1,0 +1,81 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  tweetsearch
+
+Parameters:
+  SiteDomainName:
+    Type: String
+  Certificate:
+    Type: String
+  CloudfrontManagedCachePolicy:
+    Type: String
+    Default: "658327ea-f89d-4fab-a63d-7e88639e58f6"
+
+Resources:
+  UIBucket:
+    Type: AWS::S3::Bucket
+
+  UIBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref UIBucket
+      PolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal: '*'
+            Action: s3:GetObject
+            Resource: !Sub "arn:aws:s3:::${UIBucket}/*"
+
+  CloudFrontOriginAccessIdentity:
+    Type: AWS::CloudFront::CloudFrontOriginAccessIdentity
+    Properties:
+      CloudFrontOriginAccessIdentityConfig:
+        Comment: !Sub "access-identity-${UIBucket}"
+
+  StaticCDN:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Enabled: true
+        DefaultRootObject: index.html
+        Aliases:
+          - !Ref SiteDomainName
+        ViewerCertificate:
+          AcmCertificateArn: !Ref Certificate
+          MinimumProtocolVersion: TLSv1.2_2021
+          SslSupportMethod: sni-only
+        Origins:
+          - DomainName: !GetAtt UIBucket.DomainName
+            Id: !Sub "S3-${UIBucket}"
+            S3OriginConfig:
+              OriginAccessIdentity: !Sub "origin-access-identity/cloudfront/${CloudFrontOriginAccessIdentity}"
+        DefaultCacheBehavior:
+          CachePolicyId: !Ref CloudfrontManagedCachePolicy
+          TargetOriginId: !Sub "S3-${UIBucket}"
+          ViewerProtocolPolicy: https-only
+          AllowedMethods:
+            - GET
+            - HEAD
+        HttpVersion: http2
+        CustomErrorResponses:
+          - ErrorCode: 403
+            ResponseCode: 200
+            ResponsePagePath: /index.html
+          - ErrorCode: 404
+            ResponseCode: 200
+            ResponsePagePath: /index.html
+
+
+Outputs:
+  Region:
+    Description: "Region"
+    Value: !Ref AWS::Region
+  StackName:
+    Description: "StackName"
+    Value: !Ref AWS::StackName
+  UIBucket:
+    Value: !Ref UIBucket
+  DistributionId:
+    Value: !Ref StaticCDN
+  DistributionDomainName:
+    Value: !GetAtt StaticCDN.DomainName

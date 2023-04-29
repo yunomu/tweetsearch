@@ -1,0 +1,24 @@
+version: 0.2
+
+env:
+  parameter-store:
+    SITE_DOMAIN_NAME: /tweetsearch/prod/siteDomainName
+
+phases:
+  install:
+    commands:
+      - npm install -g uglify-js
+
+  pre_build:
+    commands:
+      - elm --version
+
+  build:
+    commands:
+      - cp -r static public
+      - elm make src/Main.elm --output=static/main.opt.js --optimize
+      - uglifyjs --compress --mangle -- static/main.opt.js > public/main.js
+
+artifacts:
+  files:
+    - 'public/*'
