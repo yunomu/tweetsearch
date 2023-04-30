@@ -208,6 +208,19 @@ update msg model =
         UrlChanged url ->
             ( { model | route = Route.fromUrl url }, Cmd.none )
 
+        ChangeUser txt ->
+            ( { model | user = txt }, Cmd.none )
+
+        ClearUser ->
+            ( { model | user = "" }
+            , Nav.pushUrl model.key <| Route.path Route.Index
+            )
+
+        SetUser ->
+            ( model
+            , Nav.pushUrl model.key <| Route.path <| Route.User model.user
+            )
+
         ChangeText txt ->
             ( { model | text = txt }, Cmd.none )
 
@@ -420,6 +433,18 @@ userInput onInput clear set v =
         ]
 
 
+userView : msg -> String -> Element msg
+userView clear v =
+    Element.row []
+        [ Element.text "From user:"
+        , Element.text v
+        , Input.button []
+            { onPress = Just clear
+            , label = Element.text "Clear"
+            }
+        ]
+
+
 searchInput : (String -> msg) -> String -> Element msg
 searchInput onInput v =
     Element.row []
@@ -461,7 +486,7 @@ view : Model -> Browser.Document Msg
 view model =
     { title =
         "Tweetsearch"
-            ++ (if model.user == "" then
+            ++ (if model.route == Route.Index then
                     ""
 
                 else
@@ -470,7 +495,11 @@ view model =
     , body =
         [ Element.layout [] <|
             Element.column []
-                [ userInput ChangeUser ClearUser SetUser model.user
+                [ if model.route == Route.Index then
+                    userInput ChangeUser ClearUser SetUser model.user
+
+                  else
+                    userView ClearUser model.user
                 , searchInput ChangeText model.text
                 , Input.radioRow []
                     { onChange = SwitchDateRangeType

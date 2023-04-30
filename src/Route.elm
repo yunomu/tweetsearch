@@ -9,7 +9,6 @@ import Url.Parser.Query as Query
 type Route
     = Index
     | User String
-    | NotFound
 
 
 parser : Parser (Route -> a) a
@@ -26,10 +25,10 @@ path route =
         Index ->
             UrlBuilder.absolute [] []
 
-        _ ->
-            UrlBuilder.absolute [] []
+        User user ->
+            UrlBuilder.absolute [ user ] []
 
 
 fromUrl : Url -> Route
 fromUrl url =
-    Maybe.withDefault NotFound (P.parse parser url)
+    Maybe.withDefault Index (P.parse parser url)
