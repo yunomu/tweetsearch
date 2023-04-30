@@ -446,7 +446,7 @@ submit onSubmit =
 
 view : Model -> Browser.Document Msg
 view model =
-    { title = "test"
+    { title = "Tweetsearch" ++ Maybe.withDefault "" (Maybe.map ((++) ": @") model.user)
     , body =
         [ Element.layout [] <|
             form <|
