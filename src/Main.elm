@@ -460,7 +460,7 @@ userInput v =
         [ Input.text []
             { onChange = ChangeUser
             , text = v
-            , placeholder = Nothing
+            , placeholder = Just <| Input.placeholder [] <| Element.text "username"
             , label = Input.labelLeft [ labelWidth ] <| Element.text "From:"
             }
         , Input.button operateButtonAttr
@@ -508,7 +508,7 @@ toUserInput v =
         [ Input.text []
             { onChange = ChangeToUser
             , text = v
-            , placeholder = Nothing
+            , placeholder = Just <| Input.placeholder [] <| Element.text "username"
             , label = Input.labelLeft [ labelWidth ] <| Element.text "To:"
             }
         , Input.button operateButtonAttr
