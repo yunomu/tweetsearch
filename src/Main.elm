@@ -298,7 +298,7 @@ update msg model =
                         catMaybes
                             [ trimText model.text
                             , Maybe.map ((++) "from:") model.user
-                            , Maybe.map ((++) "to:") <| ifMaybe (model.toUser == "") model.toUser
+                            , Maybe.map ((++) "to:") <| ifMaybe (model.toUser /= "") model.toUser
                             , Maybe.map (dateQuery model.tzOffset >> (++) "since:") model.startDatePicker.date
                             , Maybe.map (Date.add Date.Days 1 >> dateQuery model.tzOffset >> (++) "until:") model.endDatePicker.date
                             ]
