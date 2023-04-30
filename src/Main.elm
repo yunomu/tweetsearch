@@ -34,6 +34,8 @@ type Msg
     | UrlChanged Url
     | OnResize Int Int
     | ChangeUser String
+    | ClearUser
+    | SetUser
     | ChangeText String
     | ChangeToUser String
     | ClearToUser
@@ -72,7 +74,7 @@ initDatePicker =
 type alias Model =
     { key : Nav.Key
     , route : Route
-    , user : Maybe String
+    , user : String
     , tzOffset : Int
     , text : String
     , toUser : String
@@ -98,10 +100,10 @@ init flags url key =
         user =
             case route of
                 Route.User username ->
-                    Just username
+                    username
 
                 _ ->
-                    Nothing
+                    ""
     in
     ( { key = key
       , route = route
@@ -249,7 +251,7 @@ update msg model =
                     in
                     ( { model
                         | startDatePicker = dp
-                        , endDatePicker = { endDP | date = Maybe.map (Date.add Date.Days 1) dp.date }
+                        , endDatePicker = { endDP | date = dp.date }
                       }
                     , Cmd.none
                     )
@@ -297,7 +299,7 @@ update msg model =
                     String.join " " <|
                         catMaybes
                             [ trimText model.text
-                            , Maybe.map ((++) "from:") model.user
+                            , Maybe.map ((++) "from:") <| ifMaybe (model.user /= "") model.user
                             , Maybe.map ((++) "to:") <| ifMaybe (model.toUser /= "") model.toUser
                             , Maybe.map (dateQuery model.tzOffset >> (++) "since:") model.startDatePicker.date
                             , Maybe.map (Date.add Date.Days 1 >> dateQuery model.tzOffset >> (++) "until:") model.endDatePicker.date
@@ -402,9 +404,20 @@ dateView typ startDP endDP =
                 ]
 
 
-form : Element msg -> Element msg
-form elm =
-    Element.html <| Html.form [] [ Element.layout [] elm ]
+userInput : (String -> msg) -> msg -> msg -> String -> Element msg
+userInput onInput clear set v =
+    Element.row []
+        [ Element.text "From user:"
+        , Element.html <| Html.input [ HtmlAttr.type_ "text", HtmlEvent.onInput onInput, HtmlAttr.value v ] []
+        , Input.button []
+            { onPress = Just clear
+            , label = Element.text "Clear"
+            }
+        , Input.button []
+            { onPress = Just set
+            , label = Element.text "Set"
+            }
+        ]
 
 
 searchInput : (String -> msg) -> String -> Element msg
@@ -446,33 +459,39 @@ submit onSubmit =
 
 view : Model -> Browser.Document Msg
 view model =
-    { title = "Tweetsearch" ++ Maybe.withDefault "" (Maybe.map ((++) ": @") model.user)
+    { title =
+        "Tweetsearch"
+            ++ (if model.user == "" then
+                    ""
+
+                else
+                    ": @" ++ model.user
+               )
     , body =
         [ Element.layout [] <|
-            form <|
-                Element.column []
-                    [ Element.text <| "From: " ++ Maybe.withDefault "(no user filter)" model.user
-                    , searchInput ChangeText model.text
-                    , Input.radioRow []
-                        { onChange = SwitchDateRangeType
-                        , options =
-                            [ Input.option OneDay <| Element.text "One day"
-                            , Input.option Range <| Element.text "Date range"
-                            ]
-                        , selected = Just model.dateRangeType
-                        , label = Input.labelLeft [] <| Element.text "DateRangeType:"
-                        }
-                    , toUserInput ChangeToUser ClearToUser model.toUser
-                    , dateView model.dateRangeType model.startDatePicker model.endDatePicker
-                    , Input.checkbox []
-                        { onChange = SwitchLive
-                        , icon = Input.defaultCheckbox
-                        , checked = model.live
-                        , label = Input.labelLeft [] <| Element.text "Live"
-                        }
-                    , timezonePicker SetTimezoneOffset model.tzOffset
-                    , submit Submit
-                    ]
+            Element.column []
+                [ userInput ChangeUser ClearUser SetUser model.user
+                , searchInput ChangeText model.text
+                , Input.radioRow []
+                    { onChange = SwitchDateRangeType
+                    , options =
+                        [ Input.option OneDay <| Element.text "One day"
+                        , Input.option Range <| Element.text "Date range"
+                        ]
+                    , selected = Just model.dateRangeType
+                    , label = Input.labelLeft [] <| Element.text "DateRangeType:"
+                    }
+                , toUserInput ChangeToUser ClearToUser model.toUser
+                , dateView model.dateRangeType model.startDatePicker model.endDatePicker
+                , Input.checkbox []
+                    { onChange = SwitchLive
+                    , icon = Input.defaultCheckbox
+                    , checked = model.live
+                    , label = Input.labelLeft [] <| Element.text "Live"
+                    }
+                , timezonePicker SetTimezoneOffset model.tzOffset
+                , submit Submit
+                ]
         ]
     }
 
