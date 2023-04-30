@@ -14,6 +14,12 @@ Parameters:
 Resources:
   UIBucket:
     Type: AWS::S3::Bucket
+    Properties:
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: false
+        BlockPublicPolicy: false
+        IgnorePublicAcls: false
+        RestrictPublicBuckets: false
 
   UIBucketPolicy:
     Type: AWS::S3::BucketPolicy
@@ -22,8 +28,7 @@ Resources:
       PolicyDocument:
         Statement:
           - Effect: Allow
-            Principal:
-              AWS: !Sub "arn:aws:iam::${AWS::AccountId}/root"
+            Principal: '*'
             Action: s3:GetObject
             Resource: !Sub "arn:aws:s3:::${UIBucket}/*"
 

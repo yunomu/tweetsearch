@@ -13,7 +13,6 @@ phases:
   build:
     commands:
       - aws cloudformation deploy --stack-name $STACK_NAME --template-file ops/template.yaml --no-fail-on-empty-changeset --parameter-overrides SiteDomainName=$SITE_DOMAIN_NAME Certificate=$CERTIFICATE
-      - aws cloudformation wait stack-update-complete --stack-name $STACK_NAME
       - aws cloudformation describe-stacks --stack-name $STACK_NAME | jq '.Stacks[].Outputs' > outputs.json
       - aws s3 sync public/ s3://`jq -r '.[]|select(.OutputKey=="UIBucket").OutputValue' outputs.json`/
       - aws cloudfront create-invalidation --distribution-id `jq -r '.[]|select(.OutputKey=="DistributionId").OutputValue' outputs.json` --paths '/*'
