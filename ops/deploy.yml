@@ -1,5 +1,10 @@
 version: 0.2
 
+env:
+  parameter-store:
+    SITE_DOMAIN_NAME: $SITE_DOMAIN_NAME_PARAM
+    CERTIFICATE: $CERTIFICAE_PARAM
+
 phases:
   pre_build:
     commands:

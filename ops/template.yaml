@@ -22,7 +22,8 @@ Resources:
       PolicyDocument:
         Statement:
           - Effect: Allow
-            Principal: !Sub "arn:aws:iam::${AWS::AccountId}/root"
+            Principal:
+              AWS: !Sub "arn:aws:iam::${AWS::AccountId}/root"
             Action: s3:GetObject
             Resource: !Sub "arn:aws:s3:::${UIBucket}/*"
 
