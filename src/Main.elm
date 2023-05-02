@@ -51,6 +51,11 @@ type Msg
     | ClearEndDate
     | SetTimezoneOffset Int
     | ChangeFilter String
+    | ChangeMinFaves Int
+    | ChangeMinRetweets Int
+    | ChangeMinReplies Int
+    | SwitchIncludeRTs Bool
+    | SwitchFilterFollows Bool
     | Submit
     | NOP
 
@@ -88,6 +93,10 @@ type alias Model =
     , startDatePicker : DatePicker
     , endDatePicker : DatePicker
     , filter : String
+    , minFaves : Int
+    , minRts : Int
+    , minReplies : Int
+    , includeRTs : Bool
     }
 
 
@@ -122,6 +131,10 @@ init flags url key =
       , startDatePicker = startDP
       , endDatePicker = endDP
       , filter = ""
+      , minFaves = 0
+      , minRts = 0
+      , minReplies = 0
+      , includeRTs = False
       }
     , Cmd.batch
         [ Nav.pushUrl key (Url.toString url)
@@ -305,18 +318,23 @@ update msg model =
         ChangeFilter filter ->
             ( { model | filter = filter }, Cmd.none )
 
+        ChangeMinFaves c ->
+            ( { model | minFaves = c }, Cmd.none )
+
+        ChangeMinRetweets c ->
+            ( { model | minRts = c }, Cmd.none )
+
+        ChangeMinReplies c ->
+            ( { model | minReplies = c }, Cmd.none )
+
+        SwitchIncludeRTs b ->
+            ( { model | includeRTs = b }, Cmd.none )
+
         Submit ->
             let
-                trimText s =
-                    if s == "" then
-                        Nothing
-
-                    else
-                        Just s
-
-                ifMaybe cond v =
-                    if cond then
-                        Just v
+                condMap cond f v =
+                    if cond v then
+                        Just (f v)
 
                     else
                         Nothing
@@ -324,12 +342,20 @@ update msg model =
                 q =
                     String.join " " <|
                         catMaybes
-                            [ trimText model.text
-                            , Maybe.map ((++) "from:") <| ifMaybe (model.user /= "") model.user
-                            , Maybe.map ((++) "to:") <| ifMaybe (model.toUser /= "") model.toUser
+                            [ condMap ((/=) "") identity model.text
+                            , condMap ((/=) "") ((++) "from:") model.user
+                            , condMap ((/=) "") ((++) "to:") model.toUser
                             , Maybe.map (dateQuery model.tzOffset >> (++) "since:") model.startDatePicker.date
                             , Maybe.map (Date.add Date.Days 1 >> dateQuery model.tzOffset >> (++) "until:") model.endDatePicker.date
-                            , Maybe.map ((++) "filter:") <| ifMaybe (model.filter /= "") model.filter
+                            , condMap ((/=) "") ((++) "filter:") model.filter
+                            , condMap ((/=) 0) (String.fromInt >> (++) "min_faves:") model.minFaves
+                            , condMap ((/=) 0) (String.fromInt >> (++) "min_retweets:") model.minRts
+                            , condMap ((/=) 0) (String.fromInt >> (++) "min_replies:") model.minReplies
+                            , if model.includeRTs then
+                                Just "include:nativeretweets"
+
+                              else
+                                Nothing
                             ]
 
                 url =
@@ -337,8 +363,12 @@ update msg model =
                         [ "search" ]
                     <|
                         catMaybes
-                            [ Just <| UrlBuilder.string "q" q
-                            , ifMaybe model.live <| UrlBuilder.string "f" "live"
+                            [ condMap ((/=) "") (UrlBuilder.string "q") q
+                            , if model.live then
+                                Just (UrlBuilder.string "f" "live")
+
+                              else
+                                Nothing
                             , Just <| UrlBuilder.string "src" "typed_query"
                             ]
             in
@@ -406,7 +436,7 @@ submitButtonAttr =
 
 labelWidth : Attribute msg
 labelWidth =
-    Element.width <| Element.px 80
+    Element.width <| Element.px 120
 
 
 rowSpace : Attribute msg
@@ -532,7 +562,7 @@ timezonePicker tzOffset =
             ( a, offsetToTz a )
     in
     Element.row [ rowSpace ]
-        [ Element.text "TimeZone:"
+        [ Element.el [ labelWidth ] <| Element.text "TimeZone:"
         , Element.html <| selectTZ tzOffset <| List.map f tzOffsets
         ]
 
@@ -547,6 +577,7 @@ filters =
     , "consumer_video"
     , "native_video"
     , "links"
+    , "hashtags"
     ]
 
 
@@ -568,6 +599,21 @@ filterSelect filter =
                 filters
         , selected = Just filter
         , label = Input.labelLeft [ labelWidth ] <| Element.text "Filter:"
+        }
+
+
+counts : List Int
+counts =
+    [ 0, 100, 1000 ]
+
+
+countFilter : String -> Int -> (Int -> msg) -> Element msg
+countFilter label v onChange =
+    Input.radioRow []
+        { onChange = onChange
+        , options = List.map (\i -> Input.option i <| Element.text <| String.fromInt i) counts
+        , selected = Just v
+        , label = Input.labelLeft [ labelWidth ] <| Element.text label
         }
 
 
@@ -619,6 +665,15 @@ view model =
                     , label = Input.labelLeft [] <| Element.text "Live"
                     }
                 , filterSelect model.filter
+                , countFilter "MinFaves:" model.minFaves ChangeMinFaves
+                , countFilter "MinRTs:" model.minRts ChangeMinRetweets
+                , countFilter "MinReplies:" model.minReplies ChangeMinReplies
+                , Input.checkbox []
+                    { onChange = SwitchIncludeRTs
+                    , icon = Input.defaultCheckbox
+                    , checked = model.includeRTs
+                    , label = Input.labelLeft [] <| Element.text "IncludeRTs"
+                    }
                 , submit
                 ]
         ]
