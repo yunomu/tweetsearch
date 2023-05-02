@@ -50,6 +50,7 @@ type Msg
     | SetEndDate DatePicker.Msg
     | ClearEndDate
     | SetTimezoneOffset Int
+    | ChangeFilter String
     | Submit
     | NOP
 
@@ -86,6 +87,7 @@ type alias Model =
     , dateRangeType : DateRangeType
     , startDatePicker : DatePicker
     , endDatePicker : DatePicker
+    , filter : String
     }
 
 
@@ -119,6 +121,7 @@ init flags url key =
       , dateRangeType = OneDay
       , startDatePicker = startDP
       , endDatePicker = endDP
+      , filter = ""
       }
     , Cmd.batch
         [ Nav.pushUrl key (Url.toString url)
@@ -299,6 +302,9 @@ update msg model =
         SetTimezoneOffset offset ->
             ( { model | tzOffset = offset }, Cmd.none )
 
+        ChangeFilter filter ->
+            ( { model | filter = filter }, Cmd.none )
+
         Submit ->
             let
                 trimText s =
@@ -323,6 +329,7 @@ update msg model =
                             , Maybe.map ((++) "to:") <| ifMaybe (model.toUser /= "") model.toUser
                             , Maybe.map (dateQuery model.tzOffset >> (++) "since:") model.startDatePicker.date
                             , Maybe.map (Date.add Date.Days 1 >> dateQuery model.tzOffset >> (++) "until:") model.endDatePicker.date
+                            , Maybe.map ((++) "filter:") <| ifMaybe (model.filter /= "") model.filter
                             ]
 
                 url =
@@ -530,6 +537,40 @@ timezonePicker tzOffset =
         ]
 
 
+filters : List String
+filters =
+    [ ""
+    , "media"
+    , "images"
+    , "twimg"
+    , "videos"
+    , "consumer_video"
+    , "native_video"
+    , "links"
+    ]
+
+
+filterSelect : String -> Element Msg
+filterSelect filter =
+    Input.radio []
+        { onChange = ChangeFilter
+        , options =
+            List.map
+                (\v ->
+                    Input.option v <|
+                        Element.text <|
+                            if v == "" then
+                                "(no filter)"
+
+                            else
+                                v
+                )
+                filters
+        , selected = Just filter
+        , label = Input.labelLeft [ labelWidth ] <| Element.text "Filter:"
+        }
+
+
 submit : Element Msg
 submit =
     Input.button submitButtonAttr
@@ -569,6 +610,7 @@ view model =
                         , label = Input.labelLeft [] <| Element.text "DateRangeType:"
                         }
                     , dateView model.dateRangeType model.startDatePicker model.endDatePicker
+                    , timezonePicker model.tzOffset
                     ]
                 , Input.checkbox []
                     { onChange = SwitchLive
@@ -576,7 +618,7 @@ view model =
                     , checked = model.live
                     , label = Input.labelLeft [] <| Element.text "Live"
                     }
-                , timezonePicker model.tzOffset
+                , filterSelect model.filter
                 , submit
                 ]
         ]
