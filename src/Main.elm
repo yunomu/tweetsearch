@@ -39,8 +39,13 @@ type Msg
     | ChangeUser String
     | ClearUser
     | SetUser
-    | ChangeText String
-    | ClearText
+    | ChangeWordText Int String
+    | SwitchWordExactMatch Int Bool
+    | ClearWordText Int
+    | AddWord
+    | RemoveWord Int
+    | ClearAllWords
+    | SwitchOrSearch Bool
     | ChangeToUser String
     | ClearToUser
     | SwitchLive Bool
@@ -81,12 +86,37 @@ initDatePicker =
     )
 
 
+type alias Word =
+    { text : String
+    , exactMatch : Bool
+    }
+
+
+newWord : Word
+newWord =
+    { text = "", exactMatch = False }
+
+
+wordToStr : Word -> String
+wordToStr word =
+    if word.exactMatch then
+        String.concat
+            [ "\""
+            , word.text
+            , "\""
+            ]
+
+    else
+        word.text
+
+
 type alias Model =
     { key : Nav.Key
     , route : Route
     , user : String
     , tzOffset : Int
-    , text : String
+    , words : List Word
+    , orSearch : Bool
     , toUser : String
     , live : Bool
     , dateRangeType : DateRangeType
@@ -124,7 +154,8 @@ init flags url key =
       , route = route
       , user = user
       , tzOffset = Maybe.withDefault 0 flags.tzOffset
-      , text = ""
+      , words = [ newWord ]
+      , orSearch = False
       , toUser = ""
       , live = True
       , dateRangeType = OneDay
@@ -192,6 +223,39 @@ catMaybes list =
             []
 
 
+elem : Int -> List a -> Maybe a
+elem i =
+    List.head << List.drop i
+
+
+elemUpdate : Int -> (a -> a) -> List a -> List a
+elemUpdate i f ls =
+    case ls of
+        x :: xs ->
+            if i <= 0 then
+                f x :: xs
+
+            else
+                x :: elemUpdate (i - 1) f xs
+
+        [] ->
+            ls
+
+
+elemRemove : Int -> List a -> List a
+elemRemove i ls =
+    case ls of
+        x :: xs ->
+            if i <= 0 then
+                xs
+
+            else
+                x :: elemRemove (i - 1) xs
+
+        [] ->
+            []
+
+
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     let
@@ -241,11 +305,40 @@ update msg model =
             , Nav.pushUrl model.key <| Route.path <| Route.User model.user
             )
 
-        ChangeText txt ->
-            ( { model | text = txt }, Cmd.none )
+        ChangeWordText idx txt ->
+            ( { model | words = elemUpdate idx (\w -> { w | text = txt }) model.words }
+            , Cmd.none
+            )
 
-        ClearText ->
-            ( { model | text = "" }, Cmd.none )
+        ClearWordText idx ->
+            ( { model | words = elemUpdate idx (\w -> { w | text = "", exactMatch = False }) model.words }
+            , Cmd.none
+            )
+
+        SwitchWordExactMatch idx b ->
+            ( { model | words = elemUpdate idx (\w -> { w | exactMatch = b }) model.words }
+            , Cmd.none
+            )
+
+        AddWord ->
+            ( { model | words = newWord :: model.words }
+            , Cmd.none
+            )
+
+        RemoveWord idx ->
+            ( { model | words = elemRemove idx model.words }
+            , Cmd.none
+            )
+
+        ClearAllWords ->
+            ( { model | words = [ newWord ], orSearch = False }
+            , Cmd.none
+            )
+
+        SwitchOrSearch flag ->
+            ( { model | orSearch = flag }
+            , Cmd.none
+            )
 
         ChangeToUser txt ->
             ( { model | toUser = txt }, Cmd.none )
@@ -339,10 +432,23 @@ update msg model =
                     else
                         Nothing
 
+                sep =
+                    if model.orSearch then
+                        " OR "
+
+                    else
+                        " "
+
+                ws =
+                    String.join sep <|
+                        List.map wordToStr <|
+                            List.filter (\w -> w.text /= "") <|
+                                List.reverse model.words
+
                 q =
                     String.join " " <|
                         catMaybes
-                            [ condMap ((/=) "") identity model.text
+                            [ condMap ((/=) "") identity ws
                             , condMap ((/=) "") ((++) "from:") model.user
                             , condMap ((/=) "") ((++) "to:") model.toUser
                             , Maybe.map (dateQuery model.tzOffset >> (++) "since:") model.startDatePicker.date
@@ -523,22 +629,6 @@ userView v =
         ]
 
 
-searchInput : String -> Element Msg
-searchInput v =
-    Element.row [ rowSpace ]
-        [ Input.text []
-            { onChange = ChangeText
-            , text = v
-            , placeholder = Nothing
-            , label = Input.labelLeft [ labelWidth ] <| Element.text "Search:"
-            }
-        , Input.button operateButtonAttr
-            { onPress = Just ClearText
-            , label = Element.text "Clear"
-            }
-        ]
-
-
 toUserInput : String -> Element Msg
 toUserInput v =
     Element.row [ rowSpace ]
@@ -625,6 +715,75 @@ submit =
         }
 
 
+zipWithIndex : List a -> List ( Int, a )
+zipWithIndex =
+    let
+        f idx ls =
+            case ls of
+                [] ->
+                    []
+
+                x :: xs ->
+                    ( idx, x ) :: f (idx + 1) xs
+    in
+    f 0
+
+
+wordView : ( Int, Word ) -> Element Msg
+wordView ( idx, word ) =
+    Element.row [ rowSpace ]
+        [ Input.text []
+            { onChange = ChangeWordText idx
+            , text = word.text
+            , placeholder = Nothing
+            , label = Input.labelLeft [ labelWidth ] <| Element.text "Word:"
+            }
+        , Input.checkbox []
+            { onChange = SwitchWordExactMatch idx
+            , icon = Input.defaultCheckbox
+            , checked = word.exactMatch
+            , label = Input.labelRight [] <| Element.text "exact match"
+            }
+        , Input.button operateButtonAttr
+            { onPress = Just (ClearWordText idx)
+            , label = Element.text "Clear"
+            }
+        , Input.button operateButtonAttr
+            { onPress = Just (RemoveWord idx)
+            , label = Element.text "Remove"
+            }
+        ]
+
+
+wordsView : List Word -> Element Msg
+wordsView =
+    Element.column [] << List.map wordView << List.reverse << zipWithIndex
+
+
+wordsInput : Bool -> List Word -> Element Msg
+wordsInput orSearch words =
+    Element.column []
+        [ wordsView words
+        , Element.row [ rowSpace ]
+            [ Element.el [ labelWidth ] Element.none
+            , Input.button operateButtonAttr
+                { onPress = Just AddWord
+                , label = Element.text "Add word"
+                }
+            , Input.button operateButtonAttr
+                { onPress = Just ClearAllWords
+                , label = Element.text "Clear all words"
+                }
+            , Input.checkbox []
+                { onChange = SwitchOrSearch
+                , icon = Input.defaultCheckbox
+                , checked = orSearch
+                , label = Input.labelRight [] <| Element.text "OR search"
+                }
+            ]
+        ]
+
+
 view : Model -> Browser.Document Msg
 view model =
     { title =
@@ -643,7 +802,7 @@ view model =
 
                   else
                     userView model.user
-                , searchInput model.text
+                , wordsInput model.orSearch model.words
                 , toUserInput model.toUser
                 , Element.column []
                     [ Input.radioRow []
